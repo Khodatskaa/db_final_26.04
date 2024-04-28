@@ -1,61 +1,60 @@
 USE [db_final_26.04]
 GO
 
--- Select all countries
+-- Selecting all data from the Countries table
 SELECT * FROM Countries;
 
--- Select all shops with their respective countries
-SELECT s.Name AS ShopName, c.Name AS CountryName
-FROM Shops s
-INNER JOIN Countries c ON s.CountryId = c.Id;
+-- Selecting all data from the Shops table
+SELECT * FROM Shops;
 
--- Select all sales with details of the coffee and shop
-SELECT sa.Id AS SaleId, sa.Price, sa.Quantity, sa.SaleDate, c.Type AS CoffeeType, sh.Name AS ShopName
-FROM Sales sa
-INNER JOIN Coffee c ON sa.CoffeeId = c.Id
-INNER JOIN Shops sh ON sa.ShopId = sh.Id;
+-- Selecting data from the Employees table with specific conditions
+SELECT * FROM Employees WHERE Position = 'Manager';
 
--- Select all employees
-SELECT * FROM Employees;
+-- Selecting data from the Customers table with specific conditions
+SELECT * FROM Customers WHERE DiscountPercentage > 0;
 
--- Select all customers
-SELECT * FROM Customers;
+-- Selecting data from the Coffee table with specific conditions
+SELECT * FROM Coffee WHERE QuantitySold > 100;
 
--- Select all orders with details of the customer
-SELECT o.Id AS OrderId, o.OrderDate, o.TotalPrice, c.Email AS CustomerEmail, c.Phone AS CustomerPhone
-FROM Orders o
-INNER JOIN Customers c ON o.CustomerId = c.CustomerId;
-
--- Select all coffees
-SELECT * FROM Coffee;
-
--- Select all suppliers
+-- Selecting data from the Suppliers table
 SELECT * FROM Suppliers;
 
--- Select all inventory items with details of the coffee and supplier
-SELECT i.Id AS InventoryId, c.Type AS CoffeeType, s.Name AS SupplierName, i.Quantity, i.PurchaseDate
-FROM Inventory i
-INNER JOIN Coffee c ON i.CoffeeId = c.Id
-INNER JOIN Suppliers s ON i.SupplierId = s.SupplierId;
-
--- Select all ingredients
+-- Selecting data from the Ingredients table
 SELECT * FROM Ingredients;
 
--- Select all recipes
+-- Selecting data from the Recipes table
 SELECT * FROM Recipes;
 
--- Select all recipe ingredients with details of the recipe and ingredient
-SELECT ri.RecipeId, r.Name AS RecipeName, i.Name AS IngredientName, ri.Quantity
-FROM RecipeIngredients ri
-INNER JOIN Recipes r ON ri.RecipeId = r.RecipeId
-INNER JOIN Ingredients i ON ri.IngredientId = i.Id;
-
--- Select all menu items
+-- Selecting data from the MenuItems table
 SELECT * FROM MenuItems;
 GO
 
--- Add Customer Procedure
-CREATE PROCEDURE AddCustomer
+-- Procedure to insert a new shop
+CREATE PROCEDURE InsertShop
+    @Name NVARCHAR(MAX),
+    @CountryId INT
+AS
+BEGIN
+    INSERT INTO Shops (Name, CountryId)
+    VALUES (@Name, @CountryId);
+END;
+GO
+
+-- Procedure to insert a new employee
+CREATE PROCEDURE InsertEmployee
+    @Position NVARCHAR(50),
+    @EmploymentDate DATE,
+    @Gender NVARCHAR(10),
+    @Salary DECIMAL(10, 2)
+AS
+BEGIN
+    INSERT INTO Employees (Position, EmploymentDate, Gender, Salary)
+    VALUES (@Position, @EmploymentDate, @Gender, @Salary);
+END;
+GO
+
+-- Procedure to insert a new customer
+CREATE PROCEDURE InsertCustomer
     @Email NVARCHAR(255),
     @Phone NVARCHAR(20),
     @PurchaseHistory TEXT,
@@ -68,76 +67,26 @@ BEGIN
 END;
 GO
 
--- Update Customer Procedure
-CREATE PROCEDURE UpdateCustomer
-    @CustomerId INT,
-    @Email NVARCHAR(255),
-    @Phone NVARCHAR(20),
-    @PurchaseHistory TEXT,
-    @DiscountPercentage DECIMAL(5, 2),
-    @SignedForMailing BIT
+-- Procedure to insert a new coffee
+CREATE PROCEDURE InsertCoffee
+    @Type NVARCHAR(100),
+    @QuantitySold INT,
+    @Price MONEY
 AS
 BEGIN
-    UPDATE Customers
-    SET Email = @Email,
-        Phone = @Phone,
-        PurchaseHistory = @PurchaseHistory,
-        DiscountPercentage = @DiscountPercentage,
-        SignedForMailing = @SignedForMailing
-    WHERE CustomerId = @CustomerId;
+    INSERT INTO Coffee (Type, QuantitySold, Price)
+    VALUES (@Type, @QuantitySold, @Price);
 END;
 GO
 
--- Delete Customer Procedure
-CREATE PROCEDURE DeleteCustomer
-    @CustomerId INT
+-- Procedure to insert a new supplier
+CREATE PROCEDURE InsertSupplier
+    @Name NVARCHAR(100),
+    @ContactName NVARCHAR(100),
+    @ContactNumber NVARCHAR(20)
 AS
 BEGIN
-    DELETE FROM Customers WHERE CustomerId = @CustomerId;
-END;
-GO
-
--- Get Sales by Date Procedure
-CREATE PROCEDURE GetSalesByDate
-    @StartDate DATE,
-    @EndDate DATE
-AS
-BEGIN
-    SELECT *
-    FROM Sales
-    WHERE SaleDate BETWEEN @StartDate AND @EndDate;
-END;
-GO
-
--- Get Employee by Position Procedure
-CREATE PROCEDURE GetEmployeesByPosition
-    @Position NVARCHAR(50)
-AS
-BEGIN
-    SELECT *
-    FROM Employees
-    WHERE Position = @Position;
-END;
-GO
-
--- Get Coffee by Type Procedure
-CREATE PROCEDURE GetCoffeeByType
-    @Type NVARCHAR(100)
-AS
-BEGIN
-    SELECT *
-    FROM Coffee
-    WHERE Type = @Type;
-END;
-GO
-
--- Get Orders by Customer Procedure
-CREATE PROCEDURE GetOrdersByCustomer
-    @CustomerId INT
-AS
-BEGIN
-    SELECT *
-    FROM Orders
-    WHERE CustomerId = @CustomerId;
+    INSERT INTO Suppliers (Name, ContactName, ContactNumber)
+    VALUES (@Name, @ContactName, @ContactNumber);
 END;
 GO
