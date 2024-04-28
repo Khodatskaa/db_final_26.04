@@ -8,14 +8,14 @@ CREATE TABLE Countries(
     Name NVARCHAR(50) NOT NULL UNIQUE
 );
 
-CREATE TABLE Shops (
+CREATE TABLE Shops(
     Id INT PRIMARY KEY IDENTITY(1,1),
     Name NVARCHAR(MAX) NOT NULL,
     CountryId INT NOT NULL,
     FOREIGN KEY (CountryId) REFERENCES Countries(Id)
 );
 
-CREATE TABLE Sales (
+CREATE TABLE Sales(
     Id INT PRIMARY KEY IDENTITY(1,1),
     Price MONEY NOT NULL CHECK (Price >= 0),
     Quantity INT NOT NULL CHECK (Quantity > 0),
@@ -32,8 +32,8 @@ CREATE TABLE Employees (
     EmploymentDate DATE,
     Gender NVARCHAR(10),
     Salary DECIMAL(10, 2),
-	ADD CONSTRAINT CHK_Salary CHECK (Salary >= 0),
-	ADD CONSTRAINT CHK_Gender CHECK (Gender IN ('Male', 'Female'));
+    CONSTRAINT CHK_Salary CHECK (Salary >= 0),
+    CONSTRAINT CHK_Gender CHECK (Gender IN ('Male', 'Female'))
 );
 
 CREATE TABLE Customers (
@@ -43,7 +43,7 @@ CREATE TABLE Customers (
     PurchaseHistory TEXT,
     DiscountPercentage DECIMAL(5, 2),
     SignedForMailing BIT,
-	ADD CONSTRAINT CHK_PhoneLength CHECK (LEN(Phone) >= 7);
+    CONSTRAINT CHK_PhoneLength CHECK (LEN(Phone) >= 7)
 );
 
 CREATE TABLE Orders (
@@ -55,11 +55,11 @@ CREATE TABLE Orders (
 );
 
 CREATE TABLE Coffee (
-	Id INT PRIMARY KEY IDENTITY(1,1),
-	Type NVARCHAR(100),
-	QuantitySold INT,
-	Price MONEY NOT NULL CHECK (Price >= 0),
-	ADD CONSTRAINT CHK_Price CHECK (Price >= 0);
+    Id INT PRIMARY KEY IDENTITY(1,1),
+    Type NVARCHAR(100),
+    QuantitySold INT,
+    Price MONEY NOT NULL CHECK (Price >= 0),
+    CONSTRAINT CHK_Price CHECK (Price >= 0)
 );
 
 CREATE TABLE Suppliers (
@@ -76,7 +76,8 @@ CREATE TABLE Inventory (
     Quantity INT NOT NULL CHECK (Quantity >= 0),
     PurchaseDate DATE NOT NULL DEFAULT GETDATE(),
     FOREIGN KEY (CoffeeId) REFERENCES Coffee(Id),
-    FOREIGN KEY (SupplierId) REFERENCES Suppliers(SupplierId)
+    FOREIGN KEY (SupplierId) REFERENCES Suppliers(SupplierId),
+    CONSTRAINT CHK_Quantity CHECK (Quantity >= 0)
 );
 
 CREATE TABLE Ingredients (
@@ -105,106 +106,127 @@ CREATE TABLE MenuItems (
     Price MONEY NOT NULL CHECK (Price >= 0)
 );
 
-DELIMITER //    
+GO
 
 --1. Trigger for Shops Table
 CREATE TRIGGER check_shop_country
-BEFORE INSERT ON Shops
-FOR EACH ROW
+ON Shops
+AFTER INSERT
+AS
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM Countries WHERE Id = NEW.CountryId) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Country does not exist';
-    END IF;
-END//
+    IF NOT EXISTS (SELECT 1 FROM Countries WHERE Id IN (SELECT CountryId FROM inserted)) 
+    BEGIN
+        RAISERROR ('Country does not exist', 16, 1);
+        ROLLBACK TRANSACTION;
+    END
+END;
+GO
 
 --2. Trigger for Sales Table
 CREATE TRIGGER update_quantity_sold
-AFTER INSERT ON Sales
-FOR EACH ROW
+ON Sales
+AFTER INSERT
+AS
 BEGIN
     UPDATE Coffee
-    SET QuantitySold = QuantitySold + NEW.Quantity
-    WHERE Id = NEW.CoffeeId;
-END//
+    SET QuantitySold = QuantitySold + (SELECT Quantity FROM inserted WHERE CoffeeId = Coffee.Id)
+    WHERE Coffee.Id IN (SELECT CoffeeId FROM inserted);
+END;
+GO
 
 --3. Trigger for Orders Table
 CREATE TRIGGER update_total_price
-BEFORE INSERT ON Orders
-FOR EACH ROW
+ON Orders
+AFTER INSERT
+AS
 BEGIN
-    DECLARE total_price DECIMAL(10, 2);
-    SET total_price = (SELECT SUM(Price * Quantity) FROM Sales WHERE ShopId = NEW.ShopId);
-    SET NEW.TotalPrice = total_price;
-END//
+    UPDATE Orders
+    SET TotalPrice = (SELECT SUM(Price * Quantity) FROM Sales WHERE Sales.ShopId = Orders.ShopId)
+    FROM Orders
+    INNER JOIN inserted ON Orders.Id = inserted.Id;
+END;
+GO
 
 --4. Trigger for Inventory Table
 CREATE TRIGGER check_inventory_quantity
-BEFORE INSERT ON Inventory
-FOR EACH ROW
+ON Inventory
+AFTER INSERT
+AS
 BEGIN
-    IF NEW.Quantity < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Quantity cannot be negative';
-    END IF;
-END//
+    IF EXISTS (SELECT 1 FROM inserted WHERE Quantity < 0) 
+    BEGIN
+        RAISERROR ('Quantity cannot be negative', 16, 1);
+        ROLLBACK TRANSACTION;
+    END
+END;
+GO
 
 --5. Trigger for Coffee Table
 CREATE TRIGGER check_price_constraint
-BEFORE INSERT ON Coffee
-FOR EACH ROW
+ON Coffee
+AFTER INSERT
+AS
 BEGIN
-    IF NEW.Price < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Price cannot be negative';
-    END IF;
-END//
+    IF EXISTS (SELECT 1 FROM inserted WHERE Price < 0) 
+    BEGIN
+        RAISERROR ('Price cannot be negative', 16, 1);
+        ROLLBACK TRANSACTION;
+    END
+END;
+GO
 
---6.
-CREATE TRIGGER check_quantity_sold_constraint
-BEFORE INSERT ON Coffee
-FOR EACH ROW
+--6. Trigger for Customers Table
+CREATE TRIGGER check_customer_email_format
+ON Customers
+AFTER INSERT
+AS
 BEGIN
-    IF NEW.QuantitySold < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Quantity sold cannot be negative';
-    END IF;
-END//
+    IF EXISTS (SELECT 1 FROM inserted WHERE Email NOT LIKE '%@%') 
+    BEGIN
+        RAISERROR ('Invalid email format', 16, 1);
+        ROLLBACK TRANSACTION;
+    END
+END;
+GO
 
 --7. Trigger for Customers Table
-CREATE TRIGGER check_customer_email_format
-BEFORE INSERT ON Customers
-FOR EACH ROW
-BEGIN
-    IF NEW.Email NOT LIKE '%@%' THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Invalid email format';
-    END IF;
-END//
-
---8.CREATE TRIGGER check_customer_phone_length
 CREATE TRIGGER check_customer_phone_length
-BEFORE INSERT ON Customers
-FOR EACH ROW
+ON Customers
+AFTER INSERT
+AS
 BEGIN
-    IF LENGTH(NEW.Phone) < 7 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Phone number must have at least 7 digits';
-    END IF;
+    IF EXISTS (SELECT 1 FROM inserted WHERE LEN(Phone) < 7) 
+    BEGIN
+        RAISERROR ('Phone number must have at least 7 digits', 16, 1);
+        ROLLBACK TRANSACTION;
+    END
 END;
+GO
+
+--8. Trigger for Employees Table
+CREATE TRIGGER check_employee_salary
+ON Employees
+AFTER INSERT
+AS
+BEGIN
+    IF EXISTS (SELECT 1 FROM inserted WHERE Salary < 0) 
+    BEGIN
+        RAISERROR ('Salary cannot be negative', 16, 1);
+        ROLLBACK TRANSACTION;
+    END
+END;
+GO
 
 --9. Trigger for Employees Table
-CREATE TRIGGER check_employee_salary
-BEFORE INSERT ON Employees
-FOR EACH ROW
+CREATE TRIGGER check_employee_gender
+ON Employees
+AFTER INSERT
+AS
 BEGIN
-    IF NEW.Salary < 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Salary cannot be negative';
-    END IF;
-END//
-
---10.CREATE TRIGGER check_employee_gender
-BEFORE INSERT ON Employees
-FOR EACH ROW
-BEGIN
-    IF NEW.Gender NOT IN ('Male', 'Female') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Invalid gender';
-    END IF;
-END//
-
-DELIMITER;
-
+    IF EXISTS (SELECT 1 FROM inserted WHERE Gender NOT IN ('Male', 'Female')) 
+    BEGIN
+        RAISERROR ('Invalid gender', 16, 1);
+        ROLLBACK TRANSACTION;
+    END
+END;
+GO
