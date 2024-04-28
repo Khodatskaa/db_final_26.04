@@ -73,7 +73,7 @@ CREATE TABLE Inventory (
     Id INT PRIMARY KEY IDENTITY(1,1),
     CoffeeId INT,
     SupplierId INT,
-    Quantity INT NOT NULL CHECK (Quantity >= 0),
+    Quantity INT NOT NULL,
     PurchaseDate DATE NOT NULL DEFAULT GETDATE(),
     FOREIGN KEY (CoffeeId) REFERENCES Coffee(Id),
     FOREIGN KEY (SupplierId) REFERENCES Suppliers(SupplierId),
