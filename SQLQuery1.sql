@@ -58,7 +58,7 @@ CREATE TABLE Coffee (
     Id INT PRIMARY KEY IDENTITY(1,1),
     Type NVARCHAR(100),
     QuantitySold INT,
-    Price MONEY NOT NULL CHECK (Price >= 0),
+    Price MONEY NOT NULL,
     CONSTRAINT CHK_Price CHECK (Price >= 0)
 );
 
